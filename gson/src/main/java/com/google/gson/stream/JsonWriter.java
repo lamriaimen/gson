@@ -490,7 +490,6 @@ public class JsonWriter implements Closeable, Flushable {
    * @param name the name of the forthcoming value. May not be {@code null}.
    * @return this writer.
    */
-  @CanIgnoreReturnValue
   /**
    * Encodes the property name and modifies the state of the writer.
    *
