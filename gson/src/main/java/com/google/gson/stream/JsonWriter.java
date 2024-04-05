@@ -491,7 +491,13 @@ public class JsonWriter implements Closeable, Flushable {
    * @return this writer.
    */
   @CanIgnoreReturnValue
-  public JsonWriter name(String name) throws IOException {
+  /**
+   * Encodes the property name and modifies the state of the writer.
+   *
+   * @param name the name of the forthcoming value. May not be {@code null}.
+   * @throws IOException if an I/O error occurs.
+   */
+  public void encodePropertyName(String name) throws IOException {
     Objects.requireNonNull(name, "name == null");
     if (deferredName != null) {
       throw new IllegalStateException("Already wrote a name, expecting a value.");
@@ -501,8 +507,19 @@ public class JsonWriter implements Closeable, Flushable {
       throw new IllegalStateException("Please begin an object before writing a name.");
     }
     deferredName = name;
+  }
+
+  /**
+   * Returns this writer after encoding the property name.
+   *
+   * @return this writer.
+   */
+  @CanIgnoreReturnValue
+  public JsonWriter name(String name) throws IOException {
+    encodePropertyName(name);
     return this;
   }
+
 
   private void writeDeferredName() throws IOException {
     if (deferredName != null) {
