@@ -669,190 +669,7 @@ public class JsonReader implements Closeable {
     return peeked = PEEKED_UNQUOTED;
   }
 
-  private int peekKeyword() throws IOException {
-    // Figure out which keyword we're matching against by its first character.
-    char c = buffer[pos];
-    String keyword;
-    String keywordUpper;
-    int peeking;
 
-    // Look at the first letter to determine what keyword we are trying to match.
-    if (c == 't' || c == 'T') {
-      keyword = "true";
-      keywordUpper = "TRUE";
-      peeking = PEEKED_TRUE;
-    } else if (c == 'f' || c == 'F') {
-      keyword = "false";
-      keywordUpper = "FALSE";
-      peeking = PEEKED_FALSE;
-    } else if (c == 'n' || c == 'N') {
-      keyword = "null";
-      keywordUpper = "NULL";
-      peeking = PEEKED_NULL;
-    } else {
-      return PEEKED_NONE;
-    }
-
-    // Uppercased keywords are not allowed in STRICT mode
-    boolean allowsUpperCased = strictness != Strictness.STRICT;
-
-    // Confirm that chars [0..length) match the keyword.
-    int length = keyword.length();
-    for (int i = 0; i < length; i++) {
-      if (pos + i >= limit && !fillBuffer(i + 1)) {
-        return PEEKED_NONE;
-      }
-      c = buffer[pos + i];
-      boolean matched = c == keyword.charAt(i) || (allowsUpperCased && c == keywordUpper.charAt(i));
-      if (!matched) {
-        return PEEKED_NONE;
-      }
-    }
-
-    if ((pos + length < limit || fillBuffer(length + 1)) && isLiteral(buffer[pos + length])) {
-      return PEEKED_NONE; // Don't match trues, falsey or nullsoft!
-    }
-
-    // We've found the keyword followed either by EOF or by a non-literal character.
-    pos += length;
-    return peeked = peeking;
-  }
-
-  private int peekNumber() throws IOException {
-    // Like nextNonWhitespace, this uses locals 'p' and 'l' to save inner-loop field access.
-    char[] buffer = this.buffer;
-    int p = pos;
-    int l = limit;
-
-    long value = 0; // Negative to accommodate Long.MIN_VALUE more easily.
-    boolean negative = false;
-    boolean fitsInLong = true;
-    int last = NUMBER_CHAR_NONE;
-
-    int i = 0;
-
-    charactersOfNumber:
-    for (; true; i++) {
-      if (p + i == l) {
-        if (i == buffer.length) {
-          // Though this looks like a well-formed number, it's too long to continue reading. Give up
-          // and let the application handle this as an unquoted literal.
-          return PEEKED_NONE;
-        }
-        if (!fillBuffer(i + 1)) {
-          break;
-        }
-        p = pos;
-        l = limit;
-      }
-
-      char c = buffer[p + i];
-      switch (c) {
-        case '-':
-          if (last == NUMBER_CHAR_NONE) {
-            negative = true;
-            last = NUMBER_CHAR_SIGN;
-            continue;
-          } else if (last == NUMBER_CHAR_EXP_E) {
-            last = NUMBER_CHAR_EXP_SIGN;
-            continue;
-          }
-          return PEEKED_NONE;
-
-        case '+':
-          if (last == NUMBER_CHAR_EXP_E) {
-            last = NUMBER_CHAR_EXP_SIGN;
-            continue;
-          }
-          return PEEKED_NONE;
-
-        case 'e':
-        case 'E':
-          if (last == NUMBER_CHAR_DIGIT || last == NUMBER_CHAR_FRACTION_DIGIT) {
-            last = NUMBER_CHAR_EXP_E;
-            continue;
-          }
-          return PEEKED_NONE;
-
-        case '.':
-          if (last == NUMBER_CHAR_DIGIT) {
-            last = NUMBER_CHAR_DECIMAL;
-            continue;
-          }
-          return PEEKED_NONE;
-
-        default:
-          if (c < '0' || c > '9') {
-            if (!isLiteral(c)) {
-              break charactersOfNumber;
-            }
-            return PEEKED_NONE;
-          }
-          if (last == NUMBER_CHAR_SIGN || last == NUMBER_CHAR_NONE) {
-            value = -(c - '0');
-            last = NUMBER_CHAR_DIGIT;
-          } else if (last == NUMBER_CHAR_DIGIT) {
-            if (value == 0) {
-              return PEEKED_NONE; // Leading '0' prefix is not allowed (since it could be octal).
-            }
-            long newValue = value * 10 - (c - '0');
-            fitsInLong &=
-                value > MIN_INCOMPLETE_INTEGER
-                    || (value == MIN_INCOMPLETE_INTEGER && newValue < value);
-            value = newValue;
-          } else if (last == NUMBER_CHAR_DECIMAL) {
-            last = NUMBER_CHAR_FRACTION_DIGIT;
-          } else if (last == NUMBER_CHAR_EXP_E || last == NUMBER_CHAR_EXP_SIGN) {
-            last = NUMBER_CHAR_EXP_DIGIT;
-          }
-      }
-    }
-
-    // We've read a complete number. Decide if it's a PEEKED_LONG or a PEEKED_NUMBER.
-    // Don't store -0 as long; user might want to read it as double -0.0
-    // Don't try to convert Long.MIN_VALUE to positive long; it would overflow MAX_VALUE
-    if (last == NUMBER_CHAR_DIGIT
-        && fitsInLong
-        && (value != Long.MIN_VALUE || negative)
-        && (value != 0 || !negative)) {
-      peekedLong = negative ? value : -value;
-      pos += i;
-      return peeked = PEEKED_LONG;
-    } else if (last == NUMBER_CHAR_DIGIT
-        || last == NUMBER_CHAR_FRACTION_DIGIT
-        || last == NUMBER_CHAR_EXP_DIGIT) {
-      peekedNumberLength = i;
-      return peeked = PEEKED_NUMBER;
-    } else {
-      return PEEKED_NONE;
-    }
-  }
-
-  @SuppressWarnings("fallthrough")
-  private boolean isLiteral(char c) throws IOException {
-    switch (c) {
-      case '/':
-      case '\\':
-      case ';':
-      case '#':
-      case '=':
-        checkLenient(); // fall-through
-      case '{':
-      case '}':
-      case '[':
-      case ']':
-      case ':':
-      case ',':
-      case ' ':
-      case '\t':
-      case '\f':
-      case '\r':
-      case '\n':
-        return false;
-      default:
-        return true;
-    }
-  }
 
   /**
    * Returns the next token, a {@link JsonToken#NAME property name}, and consumes it.
@@ -1051,188 +868,6 @@ public class JsonReader implements Closeable {
     return result;
   }
 
-  /**
-   * Returns the string up to but not including {@code quote}, unescaping any character escape
-   * sequences encountered along the way. The opening quote should have already been read. This
-   * consumes the closing quote, but does not include it in the returned string.
-   *
-   * @param quote either ' or ".
-   */
-  private String nextQuotedValue(char quote) throws IOException {
-    // Like nextNonWhitespace, this uses locals 'p' and 'l' to save inner-loop field access.
-    char[] buffer = this.buffer;
-    StringBuilder builder = null;
-    while (true) {
-      int p = pos;
-      int l = limit;
-      /* the index of the first character not yet appended to the builder. */
-      int start = p;
-      while (p < l) {
-        int c = buffer[p++];
-
-        // In strict mode, throw an exception when meeting unescaped control characters (U+0000
-        // through U+001F)
-        if (strictness == Strictness.STRICT && c < 0x20) {
-          throw syntaxError(
-              "Unescaped control characters (\\u0000-\\u001F) are not allowed in strict mode");
-        } else if (c == quote) {
-          pos = p;
-          int len = p - start - 1;
-          if (builder == null) {
-            return new String(buffer, start, len);
-          } else {
-            builder.append(buffer, start, len);
-            return builder.toString();
-          }
-        } else if (c == '\\') {
-          pos = p;
-          int len = p - start - 1;
-          if (builder == null) {
-            int estimatedLength = (len + 1) * 2;
-            builder = new StringBuilder(Math.max(estimatedLength, 16));
-          }
-          builder.append(buffer, start, len);
-          builder.append(readEscapeCharacter());
-          p = pos;
-          l = limit;
-          start = p;
-        } else if (c == '\n') {
-          lineNumber++;
-          lineStart = p;
-        }
-      }
-
-      if (builder == null) {
-        int estimatedLength = (p - start) * 2;
-        builder = new StringBuilder(Math.max(estimatedLength, 16));
-      }
-      builder.append(buffer, start, p - start);
-      pos = p;
-      if (!fillBuffer(1)) {
-        throw syntaxError("Unterminated string");
-      }
-    }
-  }
-
-  /** Returns an unquoted value as a string. */
-  @SuppressWarnings("fallthrough")
-  private String nextUnquotedValue() throws IOException {
-    StringBuilder builder = null;
-    int i = 0;
-
-    findNonLiteralCharacter:
-    while (true) {
-      for (; pos + i < limit; i++) {
-        switch (buffer[pos + i]) {
-          case '/':
-          case '\\':
-          case ';':
-          case '#':
-          case '=':
-            checkLenient(); // fall-through
-          case '{':
-          case '}':
-          case '[':
-          case ']':
-          case ':':
-          case ',':
-          case ' ':
-          case '\t':
-          case '\f':
-          case '\r':
-          case '\n':
-            break findNonLiteralCharacter;
-          default:
-            // skip character to be included in string value
-        }
-      }
-
-      // Attempt to load the entire literal into the buffer at once.
-      if (i < buffer.length) {
-        if (fillBuffer(i + 1)) {
-          continue;
-        } else {
-          break;
-        }
-      }
-
-      // use a StringBuilder when the value is too long. This is too long to be a number!
-      if (builder == null) {
-        builder = new StringBuilder(Math.max(i, 16));
-      }
-      builder.append(buffer, pos, i);
-      pos += i;
-      i = 0;
-      if (!fillBuffer(1)) {
-        break;
-      }
-    }
-
-    String result =
-        (null == builder) ? new String(buffer, pos, i) : builder.append(buffer, pos, i).toString();
-    pos += i;
-    return result;
-  }
-
-  private void skipQuotedValue(char quote) throws IOException {
-    // Like nextNonWhitespace, this uses locals 'p' and 'l' to save inner-loop field access.
-    char[] buffer = this.buffer;
-    do {
-      int p = pos;
-      int l = limit;
-      /* the index of the first character not yet appended to the builder. */
-      while (p < l) {
-        int c = buffer[p++];
-        if (c == quote) {
-          pos = p;
-          return;
-        } else if (c == '\\') {
-          pos = p;
-          char unused = readEscapeCharacter();
-          p = pos;
-          l = limit;
-        } else if (c == '\n') {
-          lineNumber++;
-          lineStart = p;
-        }
-      }
-      pos = p;
-    } while (fillBuffer(1));
-    throw syntaxError("Unterminated string");
-  }
-
-  @SuppressWarnings("fallthrough")
-  private void skipUnquotedValue() throws IOException {
-    do {
-      int i = 0;
-      for (; pos + i < limit; i++) {
-        switch (buffer[pos + i]) {
-          case '/':
-          case '\\':
-          case ';':
-          case '#':
-          case '=':
-            checkLenient(); // fall-through
-          case '{':
-          case '}':
-          case '[':
-          case ']':
-          case ':':
-          case ',':
-          case ' ':
-          case '\t':
-          case '\f':
-          case '\r':
-          case '\n':
-            pos += i;
-            return;
-          default:
-            // skip the character
-        }
-      }
-      pos += i;
-    } while (fillBuffer(1));
-  }
 
   /**
    * Returns the {@link JsonToken#NUMBER int} value of the next token, consuming it. If the next
@@ -1395,6 +1030,412 @@ public class JsonReader implements Closeable {
     pathIndices[stackSize - 1]++;
   }
 
+
+  /**
+   * Returns a <a href="https://goessner.net/articles/JsonPath/">JSONPath</a> in <i>dot-notation</i>
+   * to the next (or current) location in the JSON document. That means:
+   *
+   * <ul>
+   *   <li>For JSON arrays the path points to the index of the next element (even if there are no
+   *       further elements).
+   *   <li>For JSON objects the path points to the last property, or to the current property if its
+   *       name has already been consumed.
+   * </ul>
+   *
+   * <p>This method can be useful to add additional context to exception messages <i>before</i> a
+   * value is consumed, for example when the {@linkplain #peek() peeked} token is unexpected.
+   */
+  public String getPath() {
+    return getPath(false);
+  }
+
+  /**
+   * Returns a <a href="https://goessner.net/articles/JsonPath/">JSONPath</a> in <i>dot-notation</i>
+   * to the previous (or current) location in the JSON document. That means:
+   *
+   * <ul>
+   *   <li>For JSON arrays the path points to the index of the previous element.<br>
+   *       If no element has been consumed yet it uses the index 0 (even if there are no elements).
+   *   <li>For JSON objects the path points to the last property, or to the current property if its
+   *       name has already been consumed.
+   * </ul>
+   *
+   * <p>This method can be useful to add additional context to exception messages <i>after</i> a
+   * value has been consumed.
+   */
+  public String getPreviousPath() {
+    return getPath(true);
+  }
+
+
+  private int peekKeyword() throws IOException {
+    // Figure out which keyword we're matching against by its first character.
+    char c = buffer[pos];
+    String keyword;
+    String keywordUpper;
+    int peeking;
+
+    // Look at the first letter to determine what keyword we are trying to match.
+    if (c == 't' || c == 'T') {
+      keyword = "true";
+      keywordUpper = "TRUE";
+      peeking = PEEKED_TRUE;
+    } else if (c == 'f' || c == 'F') {
+      keyword = "false";
+      keywordUpper = "FALSE";
+      peeking = PEEKED_FALSE;
+    } else if (c == 'n' || c == 'N') {
+      keyword = "null";
+      keywordUpper = "NULL";
+      peeking = PEEKED_NULL;
+    } else {
+      return PEEKED_NONE;
+    }
+
+    // Uppercased keywords are not allowed in STRICT mode
+    boolean allowsUpperCased = strictness != Strictness.STRICT;
+
+    // Confirm that chars [0..length) match the keyword.
+    int length = keyword.length();
+    for (int i = 0; i < length; i++) {
+      if (pos + i >= limit && !fillBuffer(i + 1)) {
+        return PEEKED_NONE;
+      }
+      c = buffer[pos + i];
+      boolean matched = c == keyword.charAt(i) || (allowsUpperCased && c == keywordUpper.charAt(i));
+      if (!matched) {
+        return PEEKED_NONE;
+      }
+    }
+
+    if ((pos + length < limit || fillBuffer(length + 1)) && isLiteral(buffer[pos + length])) {
+      return PEEKED_NONE; // Don't match trues, falsey or nullsoft!
+    }
+
+    // We've found the keyword followed either by EOF or by a non-literal character.
+    pos += length;
+    return peeked = peeking;
+  }
+
+  private int peekNumber() throws IOException {
+    // Like nextNonWhitespace, this uses locals 'p' and 'l' to save inner-loop field access.
+    char[] buffer = this.buffer;
+    int p = pos;
+    int l = limit;
+
+    long value = 0; // Negative to accommodate Long.MIN_VALUE more easily.
+    boolean negative = false;
+    boolean fitsInLong = true;
+    int last = NUMBER_CHAR_NONE;
+
+    int i = 0;
+
+    charactersOfNumber:
+    for (; true; i++) {
+      if (p + i == l) {
+        if (i == buffer.length) {
+          // Though this looks like a well-formed number, it's too long to continue reading. Give up
+          // and let the application handle this as an unquoted literal.
+          return PEEKED_NONE;
+        }
+        if (!fillBuffer(i + 1)) {
+          break;
+        }
+        p = pos;
+        l = limit;
+      }
+
+      char c = buffer[p + i];
+      switch (c) {
+        case '-':
+          if (last == NUMBER_CHAR_NONE) {
+            negative = true;
+            last = NUMBER_CHAR_SIGN;
+            continue;
+          } else if (last == NUMBER_CHAR_EXP_E) {
+            last = NUMBER_CHAR_EXP_SIGN;
+            continue;
+          }
+          return PEEKED_NONE;
+
+        case '+':
+          if (last == NUMBER_CHAR_EXP_E) {
+            last = NUMBER_CHAR_EXP_SIGN;
+            continue;
+          }
+          return PEEKED_NONE;
+
+        case 'e':
+        case 'E':
+          if (last == NUMBER_CHAR_DIGIT || last == NUMBER_CHAR_FRACTION_DIGIT) {
+            last = NUMBER_CHAR_EXP_E;
+            continue;
+          }
+          return PEEKED_NONE;
+
+        case '.':
+          if (last == NUMBER_CHAR_DIGIT) {
+            last = NUMBER_CHAR_DECIMAL;
+            continue;
+          }
+          return PEEKED_NONE;
+
+        default:
+          if (c < '0' || c > '9') {
+            if (!isLiteral(c)) {
+              break charactersOfNumber;
+            }
+            return PEEKED_NONE;
+          }
+          if (last == NUMBER_CHAR_SIGN || last == NUMBER_CHAR_NONE) {
+            value = -(c - '0');
+            last = NUMBER_CHAR_DIGIT;
+          } else if (last == NUMBER_CHAR_DIGIT) {
+            if (value == 0) {
+              return PEEKED_NONE; // Leading '0' prefix is not allowed (since it could be octal).
+            }
+            long newValue = value * 10 - (c - '0');
+            fitsInLong &=
+                    value > MIN_INCOMPLETE_INTEGER
+                            || (value == MIN_INCOMPLETE_INTEGER && newValue < value);
+            value = newValue;
+          } else if (last == NUMBER_CHAR_DECIMAL) {
+            last = NUMBER_CHAR_FRACTION_DIGIT;
+          } else if (last == NUMBER_CHAR_EXP_E || last == NUMBER_CHAR_EXP_SIGN) {
+            last = NUMBER_CHAR_EXP_DIGIT;
+          }
+      }
+    }
+
+    // We've read a complete number. Decide if it's a PEEKED_LONG or a PEEKED_NUMBER.
+    // Don't store -0 as long; user might want to read it as double -0.0
+    // Don't try to convert Long.MIN_VALUE to positive long; it would overflow MAX_VALUE
+    if (last == NUMBER_CHAR_DIGIT
+            && fitsInLong
+            && (value != Long.MIN_VALUE || negative)
+            && (value != 0 || !negative)) {
+      peekedLong = negative ? value : -value;
+      pos += i;
+      return peeked = PEEKED_LONG;
+    } else if (last == NUMBER_CHAR_DIGIT
+            || last == NUMBER_CHAR_FRACTION_DIGIT
+            || last == NUMBER_CHAR_EXP_DIGIT) {
+      peekedNumberLength = i;
+      return peeked = PEEKED_NUMBER;
+    } else {
+      return PEEKED_NONE;
+    }
+  }
+
+  @SuppressWarnings("fallthrough")
+  private boolean isLiteral(char c) throws IOException {
+    switch (c) {
+      case '/':
+      case '\\':
+      case ';':
+      case '#':
+      case '=':
+        checkLenient(); // fall-through
+      case '{':
+      case '}':
+      case '[':
+      case ']':
+      case ':':
+      case ',':
+      case ' ':
+      case '\t':
+      case '\f':
+      case '\r':
+      case '\n':
+        return false;
+      default:
+        return true;
+    }
+  }
+
+  /**
+   * Returns the string up to but not including {@code quote}, unescaping any character escape
+   * sequences encountered along the way. The opening quote should have already been read. This
+   * consumes the closing quote, but does not include it in the returned string.
+   *
+   * @param quote either ' or ".
+   */
+  private String nextQuotedValue(char quote) throws IOException {
+    // Like nextNonWhitespace, this uses locals 'p' and 'l' to save inner-loop field access.
+    char[] buffer = this.buffer;
+    StringBuilder builder = null;
+    while (true) {
+      int p = pos;
+      int l = limit;
+      /* the index of the first character not yet appended to the builder. */
+      int start = p;
+      while (p < l) {
+        int c = buffer[p++];
+
+        // In strict mode, throw an exception when meeting unescaped control characters (U+0000
+        // through U+001F)
+        if (strictness == Strictness.STRICT && c < 0x20) {
+          throw syntaxError(
+                  "Unescaped control characters (\\u0000-\\u001F) are not allowed in strict mode");
+        } else if (c == quote) {
+          pos = p;
+          int len = p - start - 1;
+          if (builder == null) {
+            return new String(buffer, start, len);
+          } else {
+            builder.append(buffer, start, len);
+            return builder.toString();
+          }
+        } else if (c == '\\') {
+          pos = p;
+          int len = p - start - 1;
+          if (builder == null) {
+            int estimatedLength = (len + 1) * 2;
+            builder = new StringBuilder(Math.max(estimatedLength, 16));
+          }
+          builder.append(buffer, start, len);
+          builder.append(readEscapeCharacter());
+          p = pos;
+          l = limit;
+          start = p;
+        } else if (c == '\n') {
+          lineNumber++;
+          lineStart = p;
+        }
+      }
+
+      if (builder == null) {
+        int estimatedLength = (p - start) * 2;
+        builder = new StringBuilder(Math.max(estimatedLength, 16));
+      }
+      builder.append(buffer, start, p - start);
+      pos = p;
+      if (!fillBuffer(1)) {
+        throw syntaxError("Unterminated string");
+      }
+    }
+  }
+
+  /** Returns an unquoted value as a string. */
+  @SuppressWarnings("fallthrough")
+  private String nextUnquotedValue() throws IOException {
+    StringBuilder builder = null;
+    int i = 0;
+
+    findNonLiteralCharacter:
+    while (true) {
+      for (; pos + i < limit; i++) {
+        switch (buffer[pos + i]) {
+          case '/':
+          case '\\':
+          case ';':
+          case '#':
+          case '=':
+            checkLenient(); // fall-through
+          case '{':
+          case '}':
+          case '[':
+          case ']':
+          case ':':
+          case ',':
+          case ' ':
+          case '\t':
+          case '\f':
+          case '\r':
+          case '\n':
+            break findNonLiteralCharacter;
+          default:
+            // skip character to be included in string value
+        }
+      }
+
+      // Attempt to load the entire literal into the buffer at once.
+      if (i < buffer.length) {
+        if (fillBuffer(i + 1)) {
+          continue;
+        } else {
+          break;
+        }
+      }
+
+      // use a StringBuilder when the value is too long. This is too long to be a number!
+      if (builder == null) {
+        builder = new StringBuilder(Math.max(i, 16));
+      }
+      builder.append(buffer, pos, i);
+      pos += i;
+      i = 0;
+      if (!fillBuffer(1)) {
+        break;
+      }
+    }
+
+    String result =
+            (null == builder) ? new String(buffer, pos, i) : builder.append(buffer, pos, i).toString();
+    pos += i;
+    return result;
+  }
+
+  private void skipQuotedValue(char quote) throws IOException {
+    // Like nextNonWhitespace, this uses locals 'p' and 'l' to save inner-loop field access.
+    char[] buffer = this.buffer;
+    do {
+      int p = pos;
+      int l = limit;
+      /* the index of the first character not yet appended to the builder. */
+      while (p < l) {
+        int c = buffer[p++];
+        if (c == quote) {
+          pos = p;
+          return;
+        } else if (c == '\\') {
+          pos = p;
+          char unused = readEscapeCharacter();
+          p = pos;
+          l = limit;
+        } else if (c == '\n') {
+          lineNumber++;
+          lineStart = p;
+        }
+      }
+      pos = p;
+    } while (fillBuffer(1));
+    throw syntaxError("Unterminated string");
+  }
+
+  @SuppressWarnings("fallthrough")
+  private void skipUnquotedValue() throws IOException {
+    do {
+      int i = 0;
+      for (; pos + i < limit; i++) {
+        switch (buffer[pos + i]) {
+          case '/':
+          case '\\':
+          case ';':
+          case '#':
+          case '=':
+            checkLenient(); // fall-through
+          case '{':
+          case '}':
+          case '[':
+          case ']':
+          case ':':
+          case ',':
+          case ' ':
+          case '\t':
+          case '\f':
+          case '\r':
+          case '\n':
+            pos += i;
+            return;
+          default:
+            // skip the character
+        }
+      }
+      pos += i;
+    } while (fillBuffer(1));
+  }
+
   private void push(int newTop) {
     if (stackSize == stack.length) {
       int newLength = stackSize * 2;
@@ -1404,6 +1445,7 @@ public class JsonReader implements Closeable {
     }
     stack[stackSize++] = newTop;
   }
+
 
   /**
    * Returns true once {@code limit - pos >= minimum}. If the data is exhausted before that many
@@ -1535,7 +1577,7 @@ public class JsonReader implements Closeable {
   private void checkLenient() throws MalformedJsonException {
     if (strictness != Strictness.LENIENT) {
       throw syntaxError(
-          "Use JsonReader.setStrictness(Strictness.LENIENT) to accept malformed JSON");
+              "Use JsonReader.setStrictness(Strictness.LENIENT) to accept malformed JSON");
     }
   }
 
@@ -1622,41 +1664,6 @@ public class JsonReader implements Closeable {
     return result.toString();
   }
 
-  /**
-   * Returns a <a href="https://goessner.net/articles/JsonPath/">JSONPath</a> in <i>dot-notation</i>
-   * to the next (or current) location in the JSON document. That means:
-   *
-   * <ul>
-   *   <li>For JSON arrays the path points to the index of the next element (even if there are no
-   *       further elements).
-   *   <li>For JSON objects the path points to the last property, or to the current property if its
-   *       name has already been consumed.
-   * </ul>
-   *
-   * <p>This method can be useful to add additional context to exception messages <i>before</i> a
-   * value is consumed, for example when the {@linkplain #peek() peeked} token is unexpected.
-   */
-  public String getPath() {
-    return getPath(false);
-  }
-
-  /**
-   * Returns a <a href="https://goessner.net/articles/JsonPath/">JSONPath</a> in <i>dot-notation</i>
-   * to the previous (or current) location in the JSON document. That means:
-   *
-   * <ul>
-   *   <li>For JSON arrays the path points to the index of the previous element.<br>
-   *       If no element has been consumed yet it uses the index 0 (even if there are no elements).
-   *   <li>For JSON objects the path points to the last property, or to the current property if its
-   *       name has already been consumed.
-   * </ul>
-   *
-   * <p>This method can be useful to add additional context to exception messages <i>after</i> a
-   * value has been consumed.
-   */
-  public String getPreviousPath() {
-    return getPath(true);
-  }
 
   /**
    * Unescapes the character identified by the character or characters that immediately follow a
