@@ -27,7 +27,7 @@ import java.sql.Timestamp;
 import java.util.Date;
 
 @SuppressWarnings("JavaUtilDate")
-class SqlTimestampTypeAdapter extends TypeAdapter<Timestamp> {
+class SqlTimestampAdapter extends TypeAdapter<Timestamp> {
   static final TypeAdapterFactory FACTORY =
       new TypeAdapterFactory() {
         @SuppressWarnings("unchecked") // we use a runtime check to make sure the 'T's equal
@@ -35,7 +35,7 @@ class SqlTimestampTypeAdapter extends TypeAdapter<Timestamp> {
         public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> typeToken) {
           if (typeToken.getRawType() == Timestamp.class) {
             final TypeAdapter<Date> dateTypeAdapter = gson.getAdapter(Date.class);
-            return (TypeAdapter<T>) new SqlTimestampTypeAdapter(dateTypeAdapter);
+            return (TypeAdapter<T>) new SqlTimestampAdapter(dateTypeAdapter);
           } else {
             return null;
           }
@@ -44,7 +44,7 @@ class SqlTimestampTypeAdapter extends TypeAdapter<Timestamp> {
 
   private final TypeAdapter<Date> dateTypeAdapter;
 
-  private SqlTimestampTypeAdapter(TypeAdapter<Date> dateTypeAdapter) {
+  private SqlTimestampAdapter(TypeAdapter<Date> dateTypeAdapter) {
     this.dateTypeAdapter = dateTypeAdapter;
   }
 

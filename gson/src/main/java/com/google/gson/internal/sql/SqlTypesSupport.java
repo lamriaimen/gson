@@ -70,7 +70,7 @@ public final class SqlTypesSupport {
 
       DATE_FACTORY = SqlDateTypeAdapter.FACTORY;
       TIME_FACTORY = SqlTimeTypeAdapter.FACTORY;
-      TIMESTAMP_FACTORY = SqlTimestampTypeAdapter.FACTORY;
+      TIMESTAMP_FACTORY = SqlTimestampAdapter.FACTORY;
     } else {
       DATE_DATE_TYPE = null;
       TIMESTAMP_DATE_TYPE = null;
