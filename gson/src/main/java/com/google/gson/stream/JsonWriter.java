@@ -244,13 +244,17 @@ public class JsonWriter implements Closeable, Flushable {
    * FormattingStyle#COMPACT} if the given indent string is empty, or {@link FormattingStyle#PRETTY}
    * with the given indent if not empty.
    *
-   * @param indent a string containing only whitespace.
+   * @param spaces an integer that represants the number of spaces.
    */
-  public final void setIndent(String indent) {
-    if (indent.isEmpty()) {
+  public final void setIndent(int spaces) { // au lieu des espaces mais le nombres d'espaces
+    if (spaces <= 0) {
       setFormattingStyle(FormattingStyle.COMPACT);
     } else {
-      setFormattingStyle(FormattingStyle.PRETTY.withIndent(indent));
+      StringBuilder indentBuilder = new StringBuilder();
+      for (int i = 0; i < spaces; i++) {
+        indentBuilder.append(" ");
+      }
+      setFormattingStyle(FormattingStyle.PRETTY.withIndent(indentBuilder.toString()));
     }
   }
 

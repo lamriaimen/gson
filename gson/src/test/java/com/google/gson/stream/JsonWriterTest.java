@@ -818,7 +818,7 @@ public final class JsonWriterTest {
   public void testPrettyPrintObject() throws IOException {
     StringWriter stringWriter = new StringWriter();
     JsonWriter jsonWriter = new JsonWriter(stringWriter);
-    jsonWriter.setIndent("   ");
+    jsonWriter.setIndent(3);
 
     jsonWriter.beginObject();
     jsonWriter.name("a").value(true);
@@ -857,7 +857,7 @@ public final class JsonWriterTest {
   public void testPrettyPrintArray() throws IOException {
     StringWriter stringWriter = new StringWriter();
     JsonWriter jsonWriter = new JsonWriter(stringWriter);
-    jsonWriter.setIndent("   ");
+    jsonWriter.setIndent(3);
 
     jsonWriter.beginArray();
     jsonWriter.value(true);
@@ -1011,7 +1011,7 @@ public final class JsonWriterTest {
     JsonWriter jsonWriter = new JsonWriter(stringWriter);
     jsonWriter.setFormattingStyle(FormattingStyle.COMPACT);
     // Should overwrite formatting style
-    jsonWriter.setIndent("  ");
+    jsonWriter.setIndent(3);
 
     jsonWriter.beginObject();
     jsonWriter.name("a");

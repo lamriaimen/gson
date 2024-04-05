@@ -58,7 +58,7 @@ public final class MixedStreamTest {
     JsonWriter jsonWriter = new JsonWriter(stringWriter);
 
     jsonWriter.beginArray();
-    jsonWriter.setIndent("  ");
+    jsonWriter.setIndent(2);
     gson.toJson(BLUE_MUSTANG, Car.class, jsonWriter);
     gson.toJson(BLACK_BMW, Car.class, jsonWriter);
     gson.toJson(RED_MIATA, Car.class, jsonWriter);
