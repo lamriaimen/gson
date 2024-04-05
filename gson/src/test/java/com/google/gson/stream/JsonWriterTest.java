@@ -27,11 +27,14 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+
+import org.junit.Before;
 import org.junit.Test;
 
 @SuppressWarnings("resource")
 public final class JsonWriterTest {
 
+  private static final int NUMBER_OF_SPACES=3;
   @Test
   public void testDefaultStrictness() throws IOException {
     JsonWriter jsonWriter = new JsonWriter(new StringWriter());
@@ -818,7 +821,7 @@ public final class JsonWriterTest {
   public void testPrettyPrintObject() throws IOException {
     StringWriter stringWriter = new StringWriter();
     JsonWriter jsonWriter = new JsonWriter(stringWriter);
-    jsonWriter.setIndent(3);
+    jsonWriter.setIndent(NUMBER_OF_SPACES);
 
     jsonWriter.beginObject();
     jsonWriter.name("a").value(true);
@@ -857,7 +860,7 @@ public final class JsonWriterTest {
   public void testPrettyPrintArray() throws IOException {
     StringWriter stringWriter = new StringWriter();
     JsonWriter jsonWriter = new JsonWriter(stringWriter);
-    jsonWriter.setIndent(3);
+    jsonWriter.setIndent(NUMBER_OF_SPACES);
 
     jsonWriter.beginArray();
     jsonWriter.value(true);
@@ -1011,7 +1014,7 @@ public final class JsonWriterTest {
     JsonWriter jsonWriter = new JsonWriter(stringWriter);
     jsonWriter.setFormattingStyle(FormattingStyle.COMPACT);
     // Should overwrite formatting style
-    jsonWriter.setIndent(3);
+    jsonWriter.setIndent(NUMBER_OF_SPACES);
 
     jsonWriter.beginObject();
     jsonWriter.name("a");
