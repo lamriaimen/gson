@@ -28,34 +28,35 @@ import java.util.Date;
 
 @SuppressWarnings("JavaUtilDate")
 class SqlTimestampAdapter extends TypeAdapter<Timestamp> {
-  static final TypeAdapterFactory FACTORY =
-      new TypeAdapterFactory() {
-        @SuppressWarnings("unchecked") // we use a runtime check to make sure the 'T's equal
-        @Override
-        public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> typeToken) {
-          if (typeToken.getRawType() == Timestamp.class) {
-            final TypeAdapter<Date> dateTypeAdapter = gson.getAdapter(Date.class);
-            return (TypeAdapter<T>) new SqlTimestampAdapter(dateTypeAdapter);
-          } else {
-            return null;
-          }
-        }
-      };
+    private final TypeAdapter<Date> timestampDateTypeAdapter; // Renommé le champ en "timestampDateTypeAdapter"
 
-  private final TypeAdapter<Date> dateTypeAdapter;
+    static final TypeAdapterFactory FACTORY =
+            new TypeAdapterFactory() {
+                @SuppressWarnings("unchecked") // we use a runtime check to make sure the 'T's equal
+                @Override
+                public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> typeToken) {
+                    if (typeToken.getRawType() == Timestamp.class) {
+                        final TypeAdapter<Date> dateTypeAdapter = gson.getAdapter(Date.class);
+                        return (TypeAdapter<T>) new SqlTimestampAdapter(dateTypeAdapter);
+                    } else {
+                        return null;
+                    }
+                }
+            };
 
-  private SqlTimestampAdapter(TypeAdapter<Date> dateTypeAdapter) {
-    this.dateTypeAdapter = dateTypeAdapter;
-  }
 
-  @Override
-  public Timestamp read(JsonReader in) throws IOException {
-    Date date = dateTypeAdapter.read(in);
-    return date != null ? new Timestamp(date.getTime()) : null;
-  }
+    private SqlTimestampAdapter(TypeAdapter<Date> timestampDateTypeAdapter) { // Utilisation du nouveau nom
+        this.timestampDateTypeAdapter = timestampDateTypeAdapter; // Utilisation du nouveau nom
+    }
 
-  @Override
-  public void write(JsonWriter out, Timestamp value) throws IOException {
-    dateTypeAdapter.write(out, value);
-  }
+    @Override
+    public Timestamp read(JsonReader in) throws IOException {
+        Date date = timestampDateTypeAdapter.read(in); // Utilisation du nouveau nom
+        return date != null ? new Timestamp(date.getTime()) : null;
+    }
+
+    @Override
+    public void write(JsonWriter out, Timestamp value) throws IOException {
+        timestampDateTypeAdapter.write(out, value); // Utilisation du nouveau nom
+    }
 }

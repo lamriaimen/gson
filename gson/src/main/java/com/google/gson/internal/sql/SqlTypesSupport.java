@@ -54,14 +54,14 @@ public final class SqlTypesSupport {
 
     if (SUPPORTS_SQL_TYPES) {
       DATE_DATE_TYPE =
-          new DateType<java.sql.Date>(java.sql.Date.class) {
+          new DateType<>(java.sql.Date.class) {
             @Override
             protected java.sql.Date deserialize(Date date) {
               return new java.sql.Date(date.getTime());
             }
           };
       TIMESTAMP_DATE_TYPE =
-          new DateType<Timestamp>(Timestamp.class) {
+          new DateType<>(Timestamp.class) {
             @Override
             protected Timestamp deserialize(Date date) {
               return new Timestamp(date.getTime());
