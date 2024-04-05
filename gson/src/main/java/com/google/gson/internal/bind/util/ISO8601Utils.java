@@ -315,7 +315,7 @@ public class ISO8601Utils {
    * @param expected the expected character
    * @return true if the expected character exist at the given offset
    */
-  private static boolean checkOffset(String value, int offset, char expected) {
+  public static boolean checkOffset ( String value, int offset, char expected ) {
     return (offset < value.length()) && (value.charAt(offset) == expected);
   }
 
@@ -328,7 +328,7 @@ public class ISO8601Utils {
    * @return the int
    * @throws NumberFormatException if the value is not a number
    */
-  private static int parseInt(String value, int beginIndex, int endIndex)
+  public static int parseInt ( String value, int beginIndex, int endIndex )
       throws NumberFormatException {
     if (beginIndex < 0 || endIndex > value.length() || beginIndex > endIndex) {
       throw new NumberFormatException(value);
