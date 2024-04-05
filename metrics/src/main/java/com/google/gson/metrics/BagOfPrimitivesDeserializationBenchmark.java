@@ -29,89 +29,42 @@ import java.lang.reflect.Field;
  * @author Jesse Wilson
  * @author Joel Leitch
  */
-public class BagOfPrimitivesDeserializationBenchmark {
+public class BagOfPrimitivesDeserializationBenchmark extends DeserializationBenchmark {
 
-  private Gson gson;
-  private String json;
-
-  public static void main(String[] args) {
-    NonUploadingCaliperRunner.run(BagOfPrimitivesDeserializationBenchmark.class, args);
-  }
-
-  @BeforeExperiment
-  void setUp() throws Exception {
-    this.gson = new Gson();
+  @Override
+  protected String createJson() {
     BagOfPrimitives bag = new BagOfPrimitives(10L, 1, false, "foo");
-    this.json = gson.toJson(bag);
+    return gson.toJson(bag);
   }
 
-  /** Benchmark to measure Gson performance for deserializing an object */
-  public void timeBagOfPrimitivesDefault(int reps) {
-    for (int i = 0; i < reps; ++i) {
-      gson.fromJson(json, BagOfPrimitives.class);
-    }
-  }
-
-  /** Benchmark to measure deserializing objects by hand */
-  public void timeBagOfPrimitivesStreaming(int reps) throws IOException {
-    for (int i = 0; i < reps; ++i) {
-      StringReader reader = new StringReader(json);
-      JsonReader jr = new JsonReader(reader);
-      jr.beginObject();
-      long longValue = 0;
-      int intValue = 0;
-      boolean booleanValue = false;
-      String stringValue = null;
-      while (jr.hasNext()) {
-        String name = jr.nextName();
-        if (name.equals("longValue")) {
-          longValue = jr.nextLong();
-        } else if (name.equals("intValue")) {
-          intValue = jr.nextInt();
-        } else if (name.equals("booleanValue")) {
-          booleanValue = jr.nextBoolean();
-        } else if (name.equals("stringValue")) {
-          stringValue = jr.nextString();
-        } else {
-          throw new IOException("Unexpected name: " + name);
-        }
-      }
-      jr.endObject();
-      new BagOfPrimitives(longValue, intValue, booleanValue, stringValue);
-    }
-  }
-
-  /**
-   * This benchmark measures the ideal Gson performance: the cost of parsing a JSON stream and
-   * setting object values by reflection. We should strive to reduce the discrepancy between this
-   * and {@link #timeBagOfPrimitivesDefault(int)} .
-   */
-  public void timeBagOfPrimitivesReflectionStreaming(int reps) throws Exception {
-    for (int i = 0; i < reps; ++i) {
-      StringReader reader = new StringReader(json);
-      JsonReader jr = new JsonReader(reader);
-      jr.beginObject();
-      BagOfPrimitives bag = new BagOfPrimitives();
-      while (jr.hasNext()) {
-        String name = jr.nextName();
-        for (Field field : BagOfPrimitives.class.getDeclaredFields()) {
-          if (field.getName().equals(name)) {
-            Class<?> fieldType = field.getType();
-            if (fieldType.equals(long.class)) {
-              field.setLong(bag, jr.nextLong());
-            } else if (fieldType.equals(int.class)) {
-              field.setInt(bag, jr.nextInt());
-            } else if (fieldType.equals(boolean.class)) {
-              field.setBoolean(bag, jr.nextBoolean());
-            } else if (fieldType.equals(String.class)) {
-              field.set(bag, jr.nextString());
-            } else {
-              throw new RuntimeException("Unexpected: type: " + fieldType + ", name: " + name);
-            }
+  @Override
+  protected void deserialize(JsonReader jr) throws IOException, IllegalAccessException {
+    jr.beginObject();
+    BagOfPrimitives bag = new BagOfPrimitives();
+    while (jr.hasNext()) {
+      String name = jr.nextName();
+      for (Field field : BagOfPrimitives.class.getDeclaredFields()) {
+        if (field.getName().equals(name)) {
+          Class<?> fieldType = field.getType();
+          if (fieldType.equals(long.class)) {
+            field.setLong(bag, jr.nextLong());
+          } else if (fieldType.equals(int.class)) {
+            field.setInt(bag, jr.nextInt());
+          } else if (fieldType.equals(boolean.class)) {
+            field.setBoolean(bag, jr.nextBoolean());
+          } else if (fieldType.equals(String.class)) {
+            field.set(bag, jr.nextString());
+          } else {
+            throw new RuntimeException("Unexpected: type: " + fieldType + ", name: " + name);
           }
         }
       }
-      jr.endObject();
     }
+    jr.endObject();
+  }
+
+  @Override
+  protected Class<?> getTargetClass() {
+    return BagOfPrimitives.class;
   }
 }
