@@ -279,7 +279,7 @@ public final class JsonWriterTest {
     JsonWriter jsonWriter = new JsonWriter(stringWriter);
     jsonWriter.beginObject();
     jsonWriter.name("a");
-    jsonWriter.jsonValue("{\"b\":true}");
+    jsonWriter.writeRawJsonValue("{\"b\":true}");
     jsonWriter.name("c");
     jsonWriter.value(1);
     jsonWriter.endObject();

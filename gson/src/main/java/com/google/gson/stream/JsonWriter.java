@@ -678,7 +678,7 @@ public class JsonWriter implements Closeable, Flushable {
    * @since 2.4
    */
   @CanIgnoreReturnValue
-  public JsonWriter jsonValue(String value) throws IOException {
+  public JsonWriter writeRawJsonValue(String value) throws IOException {
     if (value == null) {
       return nullValue();
     }

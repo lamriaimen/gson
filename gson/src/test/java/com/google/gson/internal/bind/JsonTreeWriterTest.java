@@ -308,7 +308,7 @@ public final class JsonTreeWriterTest {
     JsonTreeWriter writer = new JsonTreeWriter();
     writer.beginArray();
     try {
-      writer.jsonValue("test");
+      writer.writeRawJsonValue("test");
       fail();
     } catch (UnsupportedOperationException expected) {
     }

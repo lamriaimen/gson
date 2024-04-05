@@ -237,7 +237,7 @@ public final class JsonTreeWriter extends JsonWriter {
   }
 
   @Override
-  public JsonWriter jsonValue(String value) throws IOException {
+  public JsonWriter writeRawJsonValue(String value) throws IOException {
     throw new UnsupportedOperationException();
   }
 
